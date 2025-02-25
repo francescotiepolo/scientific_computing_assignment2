@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit
+from numba import njit, prange
 
 @njit
 def init_concentration(N, M):
@@ -16,7 +16,7 @@ def init_concentration(N, M):
         c[:, j] = y
     return c
 
-@njit
+@njit(parallel=True)
 def solve_laplace(c, cluster, w=1.8, tol=1e-5, max_iter=1000):
     ''' Solve the Laplace equation using the SOR method
     Inputs:
@@ -32,7 +32,7 @@ def solve_laplace(c, cluster, w=1.8, tol=1e-5, max_iter=1000):
     for iter in range(max_iter): # Loop until max_iter if tolerance is not reached
         old_c = c.copy() # Save old field to compute new one
         diff = 0.0 # Initialize the difference, later compared to tolerance
-        for i in range(1, N-1): # Loop over every cell
+        for i in prange(1, N-1): # Loop over every cell
             for j in range(1, M-1):
                 if not cluster[i, j]: # If the cell is not part of the cluster, compute new value, else it is not needed as it is set equal to 0
                     c[i, j] = (1 - w) * old_c[i, j] + w * 0.25 * (old_c[i+1, j] + c[i-1, j] + old_c[i, j+1] + c[i, j-1])
@@ -86,28 +86,39 @@ def choose_candidate(candidates, prob):
 
 @njit
 def simulation_dla(grid_size=(100, 100), steps=500, eta=1.0, w=1.8):
+    ''' Perform Diffusion Limited Aggregation (DLA) simulation
+    Inputs:
+    - grid_size: tuple, size of the grid (N, M)
+    - steps: int, number of steps for the simulation
+    - eta: float, parameter for shape of the object
+    - w: float, relaxation parameter for solve_laplace
+    Outputs:
+    - c: np.array, concentration field/matrix after the simulation
+    - cluster: np.array, binary matrix indicating the cluster
+    - history: list, list of coordinates of the added cells
+    '''
     N, M = grid_size
-    cluster = np.zeros((N, M), dtype=np.uint8)
-    cluster[0, M//2] = True
-    c = init_concentration(N, M)
-    for i in range(N):
+    cluster = np.zeros((N, M), dtype=np.uint8) # Initialize the cluster
+    cluster[0, M//2] = True # Seed the cluster in the middle of the bottom row
+    c = init_concentration(N, M) # Initialize the concentration field
+    for i in range(N): # Set the concentration to 0 for the cluster cells
         for j in range(M):
             if cluster[i, j]: 
                 c[i, j] = 0.0
-    history = []
-    for step in range(steps):
-        c = solve_laplace(c, cluster, w=w, tol=1e-5, max_iter=1000)
-        candidates = growth_candidates(cluster)
-        if candidates.size ==0:
+    history = [] # Initialize the history of added cells
+    for step in range(steps): # Loop over the number of steps
+        c = solve_laplace(c, cluster, w=w, tol=1e-5, max_iter=1000) # Solve the Laplace equation according to the present cluster configuration
+        candidates = growth_candidates(cluster) # Find the growth candidates
+        if candidates.size ==0: # If there are no candidates, stop the simulation
             break
-        weights = np.array([c[i, j]**eta for (i, j) in candidates])
-        weights = np.clip(weights, 0, None)
-        total_weight = np.sum(weights)
-        prob = weights / total_weight
+        weights = np.array([c[i, j]**eta for (i, j) in candidates]) # Compute the weights based on the concentration field
+        weights = np.clip(weights, 0, None) # Make sure the weights are positive
+        total_weight = np.sum(weights) # Compute the total weight for narmalization
+        prob = weights / total_weight # Compute the probabilities
 
-        i_c, j_c = choose_candidate(candidates, prob)
-        cluster[i_c, j_c] = 1
+        i_c, j_c = choose_candidate(candidates, prob) # Choose a candidate based on the probabilities
+        cluster[i_c, j_c] = 1 # Add the chosen candidate to the cluster
 
-        c[i_c, j_c] = 0.0
-        history.append((i_c, j_c))
+        c[i_c, j_c] = 0.0 # Set the concentration to 0 for the added cell
+        history.append((i_c, j_c)) # Add the added cell to the history
     return c, cluster, history
