@@ -29,21 +29,22 @@ def solve_laplace(c, cluster, w=1.8, tol=1e-5, max_iter=1000):
     - c: np.array, concentration field/matrix after solving the Laplace equation
     '''
     N, M = c.shape
+    diff = 0.0
     for iter in range(max_iter): # Loop until max_iter if tolerance is not reached
         old_c = c.copy() # Save old field to compute new one
-        diff = 0.0 # Initialize the difference, later compared to tolerance
-        for i in prange(1, N-1): # Loop over every cell (parallelized)
-            for j in range(1, M-1):
-                if not cluster[i, j]: # If the cell is not part of the cluster, compute new value, else it is not needed as it is set equal to 0
+        for i in prange(1, N-1):  # Loop over all cells including boundaries
+            for j in range(M):
+                if not cluster[i, j]:
+                    # Apply periodic boundary conditions with % operator
                     c[i, j] = max((1 - w) * old_c[i, j] + 
                                   w * 0.25 * (old_c[i+1, j] + 
                                               c[i-1, j] + 
-                                              old_c[i, j+1] + 
-                                              c[i, j-1]), 0) # Make sure the concentration field is positive (negative values might result from floting-point precision erros and propagation of erros)
-                    diff = max(diff, abs(c[i, j] - old_c[i, j])) # Store the largest difference between new and old grid
-        if diff < tol: # Stop the loop when the tolerance is reached
+                                              old_c[i, (j+1) % M] + 
+                                              c[i, (j-1) % M]), 0)
+                    diff = max(diff, abs(c[i, j] - old_c[i, j]))
+        if diff < tol:
             break
-    return c 
+    return c
 @njit
 def growth_candidates(cluster):
     ''' Find the growth candidates for the cluster
