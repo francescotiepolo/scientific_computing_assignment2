@@ -32,19 +32,19 @@ def solve_laplace(c, cluster, w=1.8, tol=1e-5, max_iter=1000):
     diff = 0.0
     for iter in range(max_iter): # Loop until max_iter if tolerance is not reached
         old_c = c.copy() # Save old field to compute new one
-        for i in prange(1, N-1):  # Loop over all cells including boundaries
+        for i in prange(1, N-1):  # Loop over every cell (except upper and lower boundaries, becasue fixed to 1 and 0, respectively)
             for j in range(M):
-                if not cluster[i, j]:
-                    # Apply periodic boundary conditions with % operator
+                if not cluster[i, j]: # If the cell is not part of the cluster, update the concentration (periodic boundary conditions for left and right boundaries)
                     c[i, j] = max((1 - w) * old_c[i, j] + 
                                   w * 0.25 * (old_c[i+1, j] + 
                                               c[i-1, j] + 
                                               old_c[i, (j+1) % M] + 
                                               c[i, (j-1) % M]), 0)
                     diff = max(diff, abs(c[i, j] - old_c[i, j]))
-        if diff < tol:
+        if diff < tol: # If the difference between new and old grid is smaller than the tolerance, stop the iteration
             break
     return c
+
 @njit
 def growth_candidates(cluster):
     ''' Find the growth candidates for the cluster
