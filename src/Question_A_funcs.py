@@ -27,9 +27,11 @@ def solve_laplace(c, cluster, w=1.8, tol=1e-5, max_iter=1000):
     - max_iter: int, maximum number of iterations
     Outputs:
     - c: np.array, concentration field/matrix after solving the Laplace equation
+    - count: int, number of iterations needed
     '''
     N, M = c.shape
     diff = 0.0
+    count = 0
     for iter in range(max_iter): # Loop until max_iter if tolerance is not reached
         old_c = c.copy() # Save old field to compute new one
         for i in prange(1, N-1):  # Loop over every cell (except upper and lower boundaries, becasue fixed to 1 and 0, respectively)
@@ -41,9 +43,10 @@ def solve_laplace(c, cluster, w=1.8, tol=1e-5, max_iter=1000):
                                               old_c[i, (j+1) % M] + 
                                               c[i, (j-1) % M]), 0)
                     diff = max(diff, abs(c[i, j] - old_c[i, j]))
+        count = count + 1
         if diff < tol: # If the difference between new and old grid is smaller than the tolerance, stop the iteration
             break
-    return c
+    return c, count
 
 @njit
 def growth_candidates(cluster):
@@ -99,7 +102,7 @@ def simulation_dla(grid_size=(100, 100), steps=500, eta=1.0, w=1.8):
     Outputs:
     - c: np.array, concentration field/matrix after the simulation
     - cluster: np.array, binary matrix indicating the cluster
-    - history: list, list of coordinates of the added cells
+    - avg_iter: list, list of i
     '''
     N, M = grid_size
     cluster = np.zeros((N, M), dtype=np.uint8) # Initialize the cluster
@@ -109,9 +112,10 @@ def simulation_dla(grid_size=(100, 100), steps=500, eta=1.0, w=1.8):
         for j in range(M):
             if cluster[i, j]: 
                 c[i, j] = 0.0
-    history = [] # Initialize the history of added cells
+    iter_history = [] # Initialize the history of iterations needed for SOR
     for step in range(steps): # Loop over the number of steps
-        c = solve_laplace(c, cluster, w=w, tol=1e-5, max_iter=1000) # Solve the Laplace equation according to the present cluster configuration
+        c, count = solve_laplace(c, cluster, w=w, tol=1e-5, max_iter=1000) # Solve the Laplace equation according to the present cluster configuration
+        iter_history.append(count) # Add the number of iterations to the history
         candidates = growth_candidates(cluster) # Find the growth candidates
         if candidates.size ==0: # If there are no candidates, stop the simulation
             break
@@ -124,5 +128,5 @@ def simulation_dla(grid_size=(100, 100), steps=500, eta=1.0, w=1.8):
         cluster[i_c, j_c] = 1 # Add the chosen candidate to the cluster
 
         c[i_c, j_c] = 0.0 # Set the concentration to 0 for the added cell
-        history.append((i_c, j_c)) # Add the added cell to the history
-    return c, cluster, history
+    avg_iter = np.mean(np.array(iter_history)) # Compute the average number of iterations needed for SOR
+    return c, cluster, avg_iter
