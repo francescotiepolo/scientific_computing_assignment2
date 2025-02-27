@@ -30,9 +30,9 @@ def solve_laplace(c, cluster, w=1.8, tol=1e-5, max_iter=1000):
     - count: int, number of iterations needed
     '''
     N, M = c.shape
-    diff = 0.0
     count = 0
     for iter in range(max_iter): # Loop until max_iter if tolerance is not reached
+        diff = 0.0
         old_c = c.copy() # Save old field to compute new one
         for i in prange(1, N-1):  # Loop over every cell (except upper and lower boundaries, becasue fixed to 1 and 0, respectively)
             for j in range(M):
