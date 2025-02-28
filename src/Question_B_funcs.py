@@ -5,43 +5,48 @@ from numba import njit
 @njit
 def is_next_to_cluster(y, x, cluster):
     N, M = cluster.shape
-    moves = [(1, 0), (-1, 0), (0, 1), (0, -1)]  
+    moves = [(1, 0), (-1, 0), (0, 1), (0, -1)]
     for dy, dx in moves:
-        ny, nx = y + dy, x + dx
-        if 0 <= ny < N and 0 <= nx < M and cluster[ny, nx]:
+        ny, nx = y + dy, (x + dx) % M  # in x
+        if 0 <= ny < N and cluster[ny, nx]:  # in y range
             return True
     return False
 
 @njit
-def monte_carlo_dla(grid_size, steps):
+def spawn_walkers(num_walkers, M):
+    walkers_y = np.zeros(num_walkers, dtype=np.int32)  # start at y = 0
+    walkers_x = np.random.randint(0, M, num_walkers)  # Random x 
+    return walkers_y, walkers_x
+
+@njit
+def monte_carlo_dla(grid_size, num_walkers, steps):
     N, M = grid_size
     cluster = np.zeros((N, M), dtype=np.uint8)
-    cluster[N // 2, M // 2] = 1  # Initial seed at center
+    cluster[N - 1, M // 2] = 1  
 
-    moves = [(1, 0), (-1, 0), (0, 1), (0, -1)]  
+    moves = np.array([(1, 0), (-1, 0), (0, 1), (0, -1)]) 
+
+    walkers_y, walkers_x = spawn_walkers(num_walkers, M)  # Initial walkers
 
     for _ in range(steps):
-        # Start walker at a random x position on the top row (y = 0)
-        x = np.random.randint(0, M)
-        y = N  
+        random_moves = moves[np.random.randint(0, 4, num_walkers)]
+        walkers_y += random_moves[:, 0] 
+        walkers_x += random_moves[:, 1]  
 
-        while True:
-            dy, dx = moves[np.random.randint(0, 4)]
-            y, x = y + dy, x + dx
+        # periodic boundary conditions
+        walkers_x = np.mod(walkers_x, M)
 
-            #  periodic boundary conditions 
-            if x < 0:
-                x = M - 1
-            elif x >= M:
-                x = 0
+        # fixed boundary conditions 
+        walkers_y = np.clip(walkers_y, 0, N - 1)  
 
-            # if walker exits from top or bottom it stops existing
-            if y < 0 or y >= N:
-                break  
-
-            # Walker sticks if touches cluster 
+        # check which walkers should stick to the cluster
+        for i in range(num_walkers):
+            y, x = walkers_y[i], walkers_x[i]
             if is_next_to_cluster(y, x, cluster):
-                cluster[y, x] = 1
-                break  
+                cluster[y, x] = 1  # Walker sticks to the cluster
+                
+                new_y, new_x = spawn_walkers(1, M)  
+                walkers_y[i] = new_y[0]  
+                walkers_x[i] = new_x[0]  
 
     return cluster
