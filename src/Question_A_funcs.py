@@ -130,3 +130,12 @@ def simulation_dla(grid_size=(100, 100), steps=500, eta=1.0, w=1.8):
         c[i_c, j_c] = 0.0 # Set the concentration to 0 for the added cell
     avg_iter = np.mean(np.array(iter_history)) # Compute the average number of iterations needed for SOR
     return c, cluster, avg_iter
+
+@njit
+def plot_w(w_list, repeats, N, M, steps, eta):
+    iters = np.zeros((len(w_list), repeats), dtype=np.float64) # Initialize the array to store the iterations needed
+    for index, w in enumerate(w_list): # Loop over different w values
+        for r in range(repeats): # Repeat the simulation 3 times to get the average time
+            c, cluster, avg_iter = simulation_dla(grid_size=(N, M), steps=steps, eta=eta, w=w)
+            iters[index, r] = avg_iter # Save the time needed
+    return iters
