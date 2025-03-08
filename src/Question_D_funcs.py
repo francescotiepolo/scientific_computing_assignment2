@@ -1,23 +1,23 @@
 import numpy as np
 from numba import jit
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def initialize_grid(size, noise=0.02):
     u = np.ones((size, size)) * 0.5
     v = np.zeros((size, size))
 
-    # Small square in the center with v = 0.25
+    # small square in the center with v = 0.25
     r = size // 10  # Region size
     cx, cy = size // 2, size // 2
     v[cx - r:cx + r, cy - r:cy + r] = 0.25
 
-    # Add some noise
+    # noise
     u += noise * np.random.rand(size, size)
     v += noise * np.random.rand(size, size)
 
     return u, v
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def laplacian(Z):
     Z_up = np.roll(Z, 1, axis=0)
     Z_down = np.roll(Z, -1, axis=0)
@@ -26,7 +26,7 @@ def laplacian(Z):
 
     return (Z_up + Z_down + Z_left + Z_right - 4 * Z)
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def update(u, v, Du, Dv, f, k, dt, dx, noise=0.0):
     Lu = laplacian(u) / dx**2
     Lv = laplacian(v) / dx**2
@@ -37,7 +37,7 @@ def update(u, v, Du, Dv, f, k, dt, dx, noise=0.0):
 
     return u, v
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def run_simulation(size, steps, parameter_sets, dx, dt, noise=0.0):
     results = []
     for i in range(len(parameter_sets)):
