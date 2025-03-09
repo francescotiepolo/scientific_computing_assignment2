@@ -133,9 +133,21 @@ def simulation_dla(grid_size=(100, 100), steps=500, eta=1.0, w=1.8):
 
 @njit
 def plot_w(w_list, repeats, N, M, steps, eta):
+    ''' Perform DLA simulation for different w values and plot the results'
+    Inputs:'
+    - w_list: list, list of w values to test
+    - repeats: int, number of repeats for each w value
+    - N: int, number of rows
+    - M: int, number of columns
+    - steps: int, number of steps for the simulation
+    - eta: float, parameter for shape of the object
+    Outputs:
+    - iters: np.array, array of the average number of iterations needed for each w value
+    '''
+    
     iters = np.zeros((len(w_list), repeats), dtype=np.float64) # Initialize the array to store the iterations needed
     for index, w in enumerate(w_list): # Loop over different w values
-        for r in range(repeats): # Repeat the simulation 3 times to get the average time
+        for r in range(repeats): # Repeat the simulation 'repeats' times to get the average time
             c, cluster, avg_iter = simulation_dla(grid_size=(N, M), steps=steps, eta=eta, w=w)
-            iters[index, r] = avg_iter # Save the time needed
+            iters[index, r] = avg_iter # Save the number of iters needed
     return iters
